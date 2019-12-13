@@ -78,7 +78,7 @@ export default class Auth{
         }else{
             type="hybrid";
         }
-        const checkIdAndRedirectUri= this.rpService.checkIdAndRedirectUri(rpRepo,rpDbId,redirect_uri);
+        const checkIdAndRedirectUri=await this.rpService.checkIdAndRedirectUri(rpRepo,rpDbId,redirect_uri);
         if(!checkIdAndRedirectUri){
             res.locals.status="invalid_request";
             next();

@@ -3,7 +3,7 @@ import { ScopeType } from "../../../models/auth/scope";
 import GrantType from "../../../models/auth/grant-type";
 import AuthorizationResponseType from "../../../models/auth/authorization-response-type";
 import RelyingPartyService from "../../../services/relying-party";
-import { Transaction, Repository, TransactionRepository } from "typeorm";
+import { Transaction, TransactionManager, EntityManager } from "typeorm";
 import { RelyingParty } from "../../../models/auth/relying-party";
 import ResolverError from "../error";
 import { Inject, Service } from "typedi";
@@ -44,13 +44,13 @@ export default class RelyingPartyResolver{
     @Transaction()
     async registerRelyingParty(
         @Arg("input") input:RegisterRelyingPartyInput,
-        @TransactionRepository(RelyingParty) rpRepo?:Repository<RelyingParty>
+        @TransactionManager() mgr?:EntityManager
     ){
-        if(!rpRepo){
-            throw new ResolverError("transaction repository does not exist");
+        if(!mgr){
+            throw new ResolverError("transaction EntityManager does not exist");
         }
         return this.rpService.register(
-            rpRepo,
+            mgr,
             input.redirectUris,
             input.tokeEndpointAuthMethod,
             input.grantTypes,

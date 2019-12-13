@@ -6,12 +6,13 @@ import { Service } from "typedi";
 @Service()
 export default class RelyingPartyQueryService{
     async checkIdAndRedirectUri(repo:Repository<RelyingParty>,rpdbid:string,redirectUri:string):Promise<boolean>{
-        if (await repo.createQueryBuilder("rp")//TODO
-            .innerJoin(RelyingPartyRedirectUri,"redirectUri")
-            .where("rp.dbId= :id AND rp.redirectUri= :redirectUri", {
-                id: rpdbid,
-                redirectUri: redirectUri,
-            }).getCount() === 0
+        const query= repo.createQueryBuilder("rp")//TODO
+        .leftJoinAndSelect("rp.dbRedirectUris","RelyingPartyRedirectUri")
+        .where("rp.dbId= :id AND RelyingPartyRedirectUri.uri= :redirectUri", {
+            id: rpdbid,
+            redirectUri: redirectUri,
+        });
+        if (await query.getCount()!==1
         ) {
             return false;
         }

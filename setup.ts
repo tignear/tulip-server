@@ -1,9 +1,10 @@
 import Container from "typedi";
 import { V2 as paseto } from "paseto";
 import * as crypto from "crypto";
-import { createConnection } from "typeorm";
+import { createConnection, getConnectionManager } from "typeorm";
 
 export async function setup(){
+    Container.reset();
     Container.set("paseto.v2.local.key",paseto.generateKey("local"));//TODO
     Container.set("openid.iss","http://localhost");
     const [pub,priv]=await (new Promise((resolve,reject)=>{
@@ -28,5 +29,9 @@ export async function setup(){
         "app.authentication.clientDbId",
         ""
     );
-    const conn=await createConnection();
+    
+    const mgr=await getConnectionManager();
+    if(!mgr.has("default")){
+       await createConnection();
+    }
 }

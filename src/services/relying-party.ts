@@ -1,4 +1,4 @@
-import { Repository } from "typeorm";
+import { Repository, EntityManager } from "typeorm";
 import { RelyingParty, RelyingPartyRedirectUri, RelyingPartyGrantType, RelyingPartyResponseType, RelyingPartyScope, RelyingPartyContact } from "../models/auth/relying-party";
 import {  Service } from "typedi";
 import RelyingPartyQueryService from "./query/relying-party";
@@ -10,12 +10,12 @@ export default class RelyingPartyService{
     constructor(private readonly relyingPartyQueryService:RelyingPartyQueryService){
 
     }
-    async checkIdAndRedirectUri(repo:Repository<RelyingParty>,rpdbid:string,redirectUri:string):Promise<void>{
-        this.relyingPartyQueryService.checkIdAndRedirectUri(repo,rpdbid,redirectUri);
+    async checkIdAndRedirectUri(repo:Repository<RelyingParty>,rpdbid:string,redirectUri:string):Promise<boolean>{
+        return await this.relyingPartyQueryService.checkIdAndRedirectUri(repo,rpdbid,redirectUri);
     }
 
     async register(
-        repo:Repository<RelyingParty>,
+        mgr:EntityManager,
         redirectUris:string[],
         tokenEndpointAuthMethod:string,
         grantTypes:GrantType[],
@@ -33,17 +33,22 @@ export default class RelyingPartyService{
             r.uri=e;
             return r;
         });
+        await mgr.save(rp.dbRedirectUris);
         rp.tokenEndpointAuthMethod=tokenEndpointAuthMethod;
         rp.dbGrantTypes=grantTypes.map(e=>{
             const r=new RelyingPartyGrantType();
             r.grantType=GrantType[e];
             return r;
         });
+        await mgr.save(rp.dbGrantTypes);
+
         rp.dbResponseTypes=responseTypes.map(e=>{
             const r=new RelyingPartyResponseType();
             r.responseType=AuthorizationResponseType[e];
             return r;
         });
+        await mgr.save(rp.dbResponseTypes);
+
         rp.clientName=clientName;
         rp.clientUri=clientUri;
         rp.logoUri=logoUri;
@@ -52,14 +57,18 @@ export default class RelyingPartyService{
             r.scope=ScopeType[e];
             return r;
         });
+        await mgr.save(rp.dbScopes);
+
         rp.dbContacts=contacts.map(e=>{
             const r=new RelyingPartyContact();
             r.contact=e;
             return r;
         });
+        await mgr.save(rp.dbContacts);
+
         rp.tosUri=tosUri;
         rp.policyUri=policyUri;
-        const created=await repo.save(rp);
+        const created=await mgr.save(rp);
         console.log(created)
         return created;
     }

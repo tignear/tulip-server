@@ -24,7 +24,7 @@ export class RelyingParty extends Node{
         } 
         return arr[2];
     }
-    @OneToMany(type=>RelyingPartyRedirectUri,uri=>uri.id)
+    @OneToMany(type=>RelyingPartyRedirectUri,uri=>uri.rp)
     dbRedirectUris?:RelyingPartyRedirectUri[];
 
     @Field(type=>[String!]!)
@@ -34,14 +34,14 @@ export class RelyingParty extends Node{
     @Field()
     @Column()
     tokenEndpointAuthMethod!:string
-    @OneToMany(type=>RelyingPartyRedirectUri,grantType=>grantType.id)
+    @OneToMany(type=>RelyingPartyRedirectUri,grantType=>grantType.rp)
     dbGrantTypes?:RelyingPartyGrantType[]
 
     @Field(type=>[GrantType!]!)
     get grantTypes():GrantType[]|undefined{
         return this.dbGrantTypes?.map(e=>stringToGrantType(e.grantType)!);
     }
-    @OneToMany(type=>RelyingPartyResponseType,responseType=>responseType.id)
+    @OneToMany(type=>RelyingPartyResponseType,responseType=>responseType.rp)
     dbResponseTypes?:RelyingPartyResponseType[]
     @Field(type=>[AuthorizationResponseType!]! )
     get responseTypes():AuthorizationResponseType[]|undefined{
@@ -57,7 +57,7 @@ export class RelyingParty extends Node{
     @Field({nullable:true})
     @Column({nullable:true})
     logoUri?:string
-    @OneToMany(type=>RelyingPartyScope,scope=>scope.id)
+    @OneToMany(type=>RelyingPartyScope,scope=>scope.rp)
     dbScopes?:RelyingPartyScope[]
     @Field(type=>[ScopeType!]!)
     get scopes():ScopeType[]|undefined{
@@ -81,7 +81,7 @@ export class RelyingParty extends Node{
 export class RelyingPartyRedirectUri{
     @PrimaryGeneratedColumn("uuid")
     id?:string;
-    @ManyToOne(type=>RelyingParty,rp=>rp.dbId)
+    @ManyToOne(type=>RelyingParty,rp=>rp.dbRedirectUris)
     rp?:RelyingParty;
     @Column()
     uri!:string;
@@ -90,7 +90,7 @@ export class RelyingPartyRedirectUri{
 export class RelyingPartyGrantType{
     @PrimaryGeneratedColumn("uuid")
     id?:string;
-    @ManyToOne(type=>RelyingParty,rp=>rp.dbId)
+    @ManyToOne(type=>RelyingParty,rp=>rp.dbGrantTypes)
     rp?:RelyingParty;
     @Column()
     grantType!:string;
@@ -99,7 +99,7 @@ export class RelyingPartyGrantType{
 export class RelyingPartyResponseType{
     @PrimaryGeneratedColumn("uuid")
     id?:string;
-    @ManyToOne(type=>RelyingParty,rp=>rp.dbId)
+    @ManyToOne(type=>RelyingParty,rp=>rp.dbResponseTypes)
     rp?:RelyingParty;
     @Column()
     responseType!:string;
@@ -108,7 +108,7 @@ export class RelyingPartyResponseType{
 export class RelyingPartyScope{
     @PrimaryGeneratedColumn("uuid")
     id?:string;
-    @ManyToOne(type=>RelyingParty,rp=>rp.dbId)
+    @ManyToOne(type=>RelyingParty,rp=>rp.dbScopes)
     rp?:RelyingParty;
     @Column()
     scope!:string;
@@ -117,7 +117,7 @@ export class RelyingPartyScope{
 export class RelyingPartyContact{
     @PrimaryGeneratedColumn("uuid")
     id?:string;
-    @ManyToOne(type=>RelyingParty,rp=>rp.dbId)
+    @ManyToOne(type=>RelyingParty,rp=>rp.dbContacts)
     rp?:RelyingParty;
     @Column()
     contact!:string;
