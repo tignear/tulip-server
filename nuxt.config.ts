@@ -10,14 +10,10 @@ export default async function(){
         serverMiddleware:[
             {path:"/", handler: await middleware.middleware()},
         ],
-        buildModules: ['@nuxt/typescript-build'],
+        //modules: ['@nuxtjs/apollo'],
+        buildModules: ['@nuxt/typescript-build' ],
         extensions: ['ts'],
-        loaders: {
-            ts: {
-                configFile:"nuxt.tsconfig.json"
-            },
 
-          }
     }
     return conf;
 }

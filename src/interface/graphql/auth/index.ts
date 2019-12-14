@@ -144,7 +144,13 @@ class TokenResponse {
     @Field({ nullable: true })
     readonly idToken?: string
 }
-
+@ObjectType()
+class LoginInput{
+    @Field(type=>ID)
+    userId!:string
+    @Field()
+    password!:string
+}
 @Service()
 @Resolver()
 export class AuthResolver {

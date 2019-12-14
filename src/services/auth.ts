@@ -11,13 +11,15 @@ import ServiceError from "./error";
 import { RefreshToken, RefreshTokenScope } from '../models/auth/refresh-token';
 import AutoLogin from '../models/auth/auto-login';
 import UserGrant from '../models/auth/user-grant';
+import * as bcrypt from 'bcrypt'
 import * as R from 'ramda'
+
 export type AccessToken= {
-    scp: string[],
-    sub: string,
-    exp: Date,
-    aud: string,
-    jti:string
+    scp: string[],//scope
+    sub: string,//userId
+    exp: Date,//
+    aud: string,//rp
+    jti:string//tokenid
 }
 export type IdToken= {
     iss: string
@@ -257,31 +259,53 @@ export default class AuthService{
         if(accessToken){
             const obj:any=await paseto.decrypt(accessToken,this.pasetoLocalKey,{ignoreExp:true});
             obj.exp=new Date(obj.exp);
-            if(obj.exp.getTime()-now>=0){
-                return {login:true,accessTokenValue:<AccessToken>obj,accessToken,autoLoginToken};
+            if(
+                obj.exp.getTime()-now>=0&&
+                obj.sub===this.authenticationClientId&&
+                obj.scp.includes(ScopeType.ManageAccount)
+            ){
+                return {accessTokenValue:<AccessToken>obj,accessToken,autoLoginToken};
             }
         }
         if(!autoLoginToken){
-            return {login:false};
+            return undefined;
         }
         const r=await autoLoginRepo.findOneOrFail({where:{
             token:autoLoginToken
         }}).catch(e=>undefined);
         if(!r){
-            return {login:false};
+            return undefined;
         }
         if(now-r.updatedAt.getTime()>2*30*24*60*60*1000){//2month
-            return {login:false};
+            return undefined;
         }
         const {token:newAccessToken,value:accessTokenValue} =await this.accessToken(r.userDbId,this.authenticationClientId,[ScopeType.ManageAccount],epocSeconds);
         r.token=crypto.randomBytes(16).toString('base64');
         await autoLoginRepo.update(r.id,r);
-        return {login:true,accessTokenValue,accessToken:newAccessToken,autoLoginToken:r.token};
+        return {accessTokenValue,accessToken:newAccessToken,autoLoginToken:r.token};
     }
     async checkUserGrant(grantRepo:Repository<UserGrant>,rpDbId:string,userDbId:string,scopes:ScopeType[]){
         const grants=await grantRepo.find({where:{rpDbID:rpDbId,userDbID:userDbId}});
         const grantedScopes=grants.map(e=>stringToEnum(e.scope));
         const additionalRequireScopes=scopes.filter(e=>!grantedScopes.includes(e))
         return {grantedScopes,additionalRequireScopes};
+    }
+    async login(
+        userRepo:Repository<User>,
+        autoLoginRepo:Repository<AutoLogin>,
+        userDbId:string,password:string){
+            
+        const user=await userRepo.findOne(userDbId);
+        if(!user){
+            return undefined;
+        }
+        if(!await bcrypt.compare(password,user.mcfPassword)){
+            return undefined;
+        }
+        const epocSeconds=Math.floor(Date.now()/1000);
+        const {token:accessToken,value:accessTokenValue} =await this.accessToken(userDbId,this.authenticationClientId,[ScopeType.ManageAccount],epocSeconds);
+        const autoLoginToken=AutoLogin.fromUserDbId(userDbId,crypto.randomBytes(16).toString('base64'));
+        await autoLoginRepo.save(autoLoginToken);
+        return {user,accessToken,accessTokenValue,autoLoginToken:autoLoginToken.token};
     }
 }

@@ -69,7 +69,6 @@ export default class RelyingPartyService{
         rp.tosUri=tosUri;
         rp.policyUri=policyUri;
         const created=await mgr.save(rp);
-        console.log(created)
         return created;
     }
 }

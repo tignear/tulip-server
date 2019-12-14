@@ -131,8 +131,7 @@ export class UserResolver{
         const user=new User()
         user.mcfPassword = await bcrypt.hash(input.password,10);
         user.name=input.name;
-
-            
+        user.lastAuthTime=new Date();
             
         const r=await userRepo.save(user);
         const outher=new Outher();

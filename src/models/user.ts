@@ -10,11 +10,11 @@ export class User implements Node{
         return this.dbId?User.toId(this.dbId):undefined;
     }
     static toDbId(id:string):string|undefined{
-        const s=id.split(".")[0];
-        if(s.length===2){
+        const s=id.split(".");
+        if(s.length!==2){
             return undefined;
         }
-        if(s[0]==="user"){
+        if(s[0]!=="user"){
             return undefined;
         }
         return s[1];
@@ -28,7 +28,7 @@ export class User implements Node{
     @Field()
     @Column()
     @Index({ unique: true })
-    name?:string;
+    name!:string;
 
     @Field(type=>OutherConnection,{nullable:true})
     outhers?:OutherConnection
@@ -37,7 +37,7 @@ export class User implements Node{
     dbOuthers?:Outher[];
 
     @Column()
-    mcfPassword?:string;//Modular Crypt Format
+    mcfPassword!:string;//Modular Crypt Format
 
     @Column()
     lastAuthTime?:Date;

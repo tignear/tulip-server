@@ -21,6 +21,33 @@ input AddUserInput {
   password: String!
 }
 
+input AuthorizationInput {
+  userId: ID!
+  password: String!
+  scope: [ScopeType!]!
+  redirectUri: String!
+  responseType: [AuthorizationResponseType!]!
+  clientId: String!
+  state: String
+
+  """reply attack protection."""
+  nonce: String
+  maxAge: Int
+}
+
+union AuthorizationResponse = CodeFlowAuthorizationResponse | ImplicitFlowAuthorizationResponse | HybridFlowAuthorizationResponse
+
+enum AuthorizationResponseType {
+  Code
+  Token
+  IdToken
+}
+
+type CodeFlowAuthorizationResponse {
+  code: String!
+  state: String
+}
+
 interface Connection {
   pageInfo: PageInfo!
   edges: [Edge!]!
@@ -29,6 +56,20 @@ interface Connection {
 interface Edge {
   cursor: String!
   node: Node!
+}
+
+enum GrantType {
+  AuthorizationCode
+  RefreshToken
+}
+
+type HybridFlowAuthorizationResponse {
+  code: String!
+  accessToken: String
+  tokenType: TokenType!
+  idToken: String
+  expiresIn: Int
+  state: String!
 }
 
 type Image implements Node {
@@ -73,6 +114,19 @@ enum ImagesOrder {
   Title
 }
 
+type ImplicitFlowAuthorizationResponse {
+  accessToken: String
+  tokenType: TokenType!
+  idToken: String
+  expiresIn: Int
+  state: String!
+}
+
+type LoginInput {
+  userId: ID!
+  password: String!
+}
+
 type Mutation {
   addImage(input: AddImageInput!): Image!
   updateImage(input: UpdateImageInput!): Image!
@@ -81,6 +135,11 @@ type Mutation {
   addUser(input: AddUserInput!): User!
   updateUser(input: UpdateUserInput!): User!
   remove(id: ID!): Node!
+
+  """only call our web app"""
+  authorization(input: AuthorizationInput!): AuthorizationResponse!
+  token(input: TokenInput!): TokenResponse!
+  registerRelyingParty(input: RegisterRelyingPartyInput!): RelyingParty!
 }
 
 interface Node {
@@ -133,6 +192,40 @@ type Query {
   node(id: ID!): Node!
 }
 
+input RegisterRelyingPartyInput {
+  redirectUris: [String!]!
+  tokeEndpointAuthMethod: String!
+  grantTypes: [GrantType!]!
+  responseTypes: [AuthorizationResponseType!]!
+  clientName: String!
+  clientUri: String
+  logoUri: String
+  scopes: [ScopeType!]!
+  contacts: [String!]
+  tosUri: String
+  policyUri: String
+}
+
+type RelyingParty implements Node {
+  id: ID!
+  redirectUris: [String!]!
+  tokenEndpointAuthMethod: String!
+  grantTypes: [GrantType!]!
+  responseTypes: [AuthorizationResponseType!]!
+  clientName: String!
+  clientUri: String
+  logoUri: String
+  scopes: [ScopeType!]!
+  contacts: [String!]!
+  tosUri: String
+  policyUri: String
+}
+
+enum ScopeType {
+  OpenId
+  ManageAccount
+}
+
 type Tag implements Node {
   id: ID!
   name: String!
@@ -148,6 +241,27 @@ type TagConnection implements Connection {
 type TagEdge implements Edge {
   cursor: String!
   node: Tag!
+}
+
+input TokenInput {
+  grantType: GrantType!
+  code: String
+  redirectUri: String
+  clientId: String
+  refreshToken: String
+}
+
+type TokenResponse {
+  accessToken: String!
+  tokenType: Float!
+  expiresIn: Float!
+  scopes: [ScopeType!]!
+  refreshToken: String!
+  idToken: String
+}
+
+enum TokenType {
+  Bearer
 }
 
 input UpdateImageInput {

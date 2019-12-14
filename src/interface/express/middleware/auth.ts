@@ -18,8 +18,39 @@ export default class Auth{
     ){
 
     }
-    middleware(req: Express.Request, res:Express.Response, next:Express.NextFunction){
+    middlewareGet(req: Express.Request, res:Express.Response, next:Express.NextFunction){
         this.internal(req,res,next).catch(next);
+    }
+    middlewarePost(req: Express.Request, res:Express.Response, next:Express.NextFunction){
+        this.login(req,res,next)
+    }
+    @Transaction()
+    async login(
+        req: Express.Request,
+         res:Express.Response, 
+         next:Express.NextFunction,
+         @TransactionRepository(User) userRepo?:Repository<User>,
+         @TransactionRepository(AutoLogin) autoLoginRepo?:Repository<AutoLogin>,
+
+        ){
+        const userDbId:string|undefined=User.toDbId(req.body.userId);
+        const password:string|undefined=req.body.password;
+        if(!userRepo||!autoLoginRepo){
+            throw new Error("Transaction repository does not exist");
+        }
+        if(!userDbId||!password){
+            res.json({error:"userId and password does not gived or userId is invalid"});
+            return;
+        }
+        const r=await this.authService.login(userRepo,autoLoginRepo,userDbId,password);
+        if(!r){
+            res.json({error:"login failed"});
+            return;
+        }
+        res.cookie("accessToken",r.accessToken,{maxAge:r.accessTokenValue.exp.getTime(),path:"/auth"});
+        res.cookie("autoLoginToken",r.autoLoginToken,{httpOnly:true,maxAge:2147483647,path:"/auth"});//year 2038 problem
+        res.json({accessToken:r.accessToken,expiresIn:r.accessTokenValue.exp.getTime(),name:r.user.name});
+        return;
     }
     buildURI(rediretUrI:string,sep:string,param:{[key:string] : string|undefined }){
         return rediretUrI+sep+Object.keys(param).reduce<[string,string][]>((a,e)=>{
@@ -42,9 +73,13 @@ export default class Auth{
         if(!autoLoginRepo||!rpRepo||!grantRepo||!acRepo||!userRepo){
             throw new Error("transaction repository not exist");
         }
-        const accessTokenRaw:string|undefined=req?.cookies?.accessToken;
-        const autoLoginToken:string|undefined=req?.cookies?.autoLoginToken
-        const r=await this.authService.autoLogin(autoLoginRepo,accessTokenRaw,autoLoginToken);
+        const response_type:string|undefined=req.query["response_type"];
+        if(!response_type){
+            res.locals.status="invalid_request";
+            next();
+            return;
+        }
+
 
         const rawRpId:string|undefined=req.query["client_id"];
         if(!rawRpId){
@@ -59,12 +94,7 @@ export default class Auth{
             next();
             return;
         }
-        const response_type:string|undefined=req.query["response_type"];
-        if(!response_type){
-            res.locals.status="invalid_request";
-            next();
-            return;
-        }
+
         let response_typeStringArray:string[]=response_type.split(" ");
         response_typeStringArray=response_typeStringArray.filter(e=>e==="code"||e==="id_token"||e==="token");
         const response_typeStringSet=new Set(response_typeStringArray)
@@ -84,15 +114,21 @@ export default class Auth{
             next();
             return;
         }
-        if(!r.login&&req.query["prompt"]==="none"){
+
+        const accessTokenRaw:string|undefined=req?.cookies?.accessToken;
+        const autoLoginToken:string|undefined=req?.cookies?.autoLoginToken;
+        const r=await this.authService.autoLogin(autoLoginRepo,accessTokenRaw,autoLoginToken);
+        if(!r&&req.query["prompt"]==="none"){
             res.redirect(302,this.buildURI(redirect_uri,type==="code"?"?":"#",{error:"login_required",state:req.query.state}));
             return;
         }
-        if(!r.login||!r.accessTokenValue){
+        if(!r){
             res.locals.status="login_required";
             next();
             return;
         }
+        res.cookie("accessToken",r.accessToken,{maxAge:r.accessTokenValue.exp.getTime(),path:"/auth"});
+        res.cookie("autoLoginToken",r.autoLoginToken,{httpOnly:true,maxAge:2147483647,path:"/auth"});//year 2038 problem
         const userDbId=User.toDbId(r.accessTokenValue.sub);
         if(!userDbId){
             throw new Error("illegal state");

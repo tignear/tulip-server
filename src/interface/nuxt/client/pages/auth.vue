@@ -11,12 +11,11 @@ import Vue from 'vue';
 import * as express from 'express';
 import {Context } from '@nuxt/types'
 import Error from '../components/error.vue';
-import Login from '../components/error.vue'
+import Login from '../components/login.vue'
 
 export default{
   async asyncData(context:Context){
     const res=<express.Response>context.res;
-    console.log(res.locals)
     const status=res.locals.status;
     const err=status==="invalid_request";
     return {status,err};
