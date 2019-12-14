@@ -1,7 +1,8 @@
 <template>
   <div>
     <h1>This is auth page</h1>
-    <error v-if="err" v-bind:status="status"></error>
+    <Error v-if="err" v-bind:status="status"></Error>
+    <Login v-if="status==='login_required'" v-bind:status="status"></Login>
   </div>
 </template>
 
@@ -9,7 +10,9 @@
 import Vue from 'vue';
 import * as express from 'express';
 import {Context } from '@nuxt/types'
-import error from '../components/error.vue'
+import Error from '../components/error.vue';
+import Login from '../components/error.vue'
+
 export default{
   async asyncData(context:Context){
     const res=<express.Response>context.res;
@@ -22,7 +25,7 @@ export default{
     return {err:false,status:"loading"}
   },
   components:{
-    error
+    Error,Login
   }
 }
 </script>
