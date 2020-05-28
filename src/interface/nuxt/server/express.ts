@@ -11,7 +11,7 @@ import Auth from "../../express/middleware/auth";
 import Container, { Inject } from "typedi";
 import { GraphQLSchema } from "graphql";
 import bodyParser from "body-parser"
-
+import cookies from "cookie-parser";
 export default class ServerMiddleware {
     app:Promise<express.Application>;
     constructor(
@@ -26,7 +26,8 @@ export default class ServerMiddleware {
     async init() {
         const app = express();
         const auth=Container.get(Auth);
-        app.use(bodyParser.json())
+        app.use(bodyParser.json());
+        app.use(cookies())
         app.get("/auth", auth.middlewareGet.bind(auth));
         app.post("/auth", auth.middlewarePost.bind(auth))
         const schema =this.schema
@@ -39,6 +40,7 @@ export default class ServerMiddleware {
                     const bearer = parseBearerToken(req);
                     let scope: ScopeType[] | undefined;
                     let userInfo: UserInfo | undefined;
+
                     if (bearer) {
                         const obj: any = await Paseto.decrypt(bearer, this.localKey);
                         const userDbId = User.toDbId(obj.sub);

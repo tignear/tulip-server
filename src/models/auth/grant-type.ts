@@ -23,7 +23,5 @@ export function stringToGrantType(src:(string|undefined)[]|string|undefined){
         return a;
     },[]);
 }
-registerEnumType(GrantType, {
-    name: "GrantType", // this one is mandatory
-});
+
 export default GrantType;

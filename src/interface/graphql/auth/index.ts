@@ -1,4 +1,4 @@
-import { Resolver, Mutation, InputType, Field, Arg, Ctx, registerEnumType, ObjectType, createUnionType, ID, Int } from "type-graphql";
+import { Resolver, Mutation, InputType, Field, Arg, Ctx, ObjectType, createUnionType, ID, Int, Query } from "type-graphql";
 import Context from "../context";
 import { RefreshToken } from "../../../models/auth/refresh-token";
 import { AuthorizationCode } from "../../../models/auth/authorization-code";
@@ -16,11 +16,6 @@ import AuthorizationResponseType from "../../../models/auth/authorization-respon
 
 @InputType()
 class AuthorizationInput {
-
-    @Field(type => ID)
-    userId!: string;
-    @Field()
-    password!: string;
     @Field(type => ScopeType)
     scope!: ScopeType[]
     @Field()
@@ -38,10 +33,13 @@ class AuthorizationInput {
 }
 @ObjectType()
 class CodeFlowAuthorizationResponse {
-    constructor(code:string,state?:string){
+    constructor(code:string,scope:ScopeType[],state?:string){
         this.code=code;
+        this.scope=scope;
         this.state=state;
     }
+    @Field(type=>ScopeType)
+    scope:ScopeType[]
     @Field()
     code: string
     @Field({nullable:true})
@@ -109,12 +107,10 @@ class TokenInput {
     @Field({ nullable: true })
     readonly refreshToken?:string;
 }
-enum TokenType {
+export enum TokenType {
     Bearer
 }
-registerEnumType(TokenType, {
-    name: "TokenType", // this one is mandatory
-});
+
 @ObjectType()
 class TokenResponse {
     constructor(
@@ -144,13 +140,13 @@ class TokenResponse {
     @Field({ nullable: true })
     readonly idToken?: string
 }
-@ObjectType()
+/*@ObjectType()
 class LoginInput{
     @Field(type=>ID)
     userId!:string
     @Field()
     password!:string
-}
+}*/
 @Service()
 @Resolver()
 export class AuthResolver {
@@ -160,6 +156,7 @@ export class AuthResolver {
     ) {
 
     }
+    
     @Transaction()
     async refresh(
         refreshToken:string,
@@ -183,9 +180,7 @@ export class AuthResolver {
         if(!context.scopes.includes(ScopeType.ManageAccount)){
             throw new ResolverError("permission denied");
         }
-        if(!context.scopes?.includes(ScopeType.ManageAccount)){
-            throw new ResolverError("authorization is no call directly.");
-        }
+
         if(!input.responseType||input.responseType.length===0){
             throw new ResolverError("require responseType.");
         }
@@ -200,7 +195,7 @@ export class AuthResolver {
         }
         if(input.responseType.length===2){
             if(input.responseType.includes(AuthorizationResponseType.Token)&&input.responseType.includes(AuthorizationResponseType.IdToken)){
-                return this.authorizationImplicit(input,context)
+                return this.authorizationImplicit(input,context);
             }
         }
         return this.authorizationHybrid(input,context);
@@ -225,7 +220,7 @@ export class AuthResolver {
         }
         const rpdbid = RelyingParty.toDbId(input.clientId);
 
-        const userdbid=User.toDbId(input.userId)
+        const userdbid=context.userInfo!.userDbId;
         if(!rpdbid){
             throw new ResolverError("invalid clientId format")
         }
@@ -236,7 +231,7 @@ export class AuthResolver {
             throw new ResolverError("invalid RedirectUri or clientId");
         }
         const ac=await this.authService.authorizationWithCode(rprepo,acrepo,userdbid,rpdbid,input.redirectUri,input.nonce,input.scope);
-        return new CodeFlowAuthorizationResponse(ac.code,input.state);
+        return new CodeFlowAuthorizationResponse(ac.code,input.scope,input.state);
     }
     @Transaction()
     async authorizationImplicit(

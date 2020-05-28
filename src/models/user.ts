@@ -1,7 +1,7 @@
-import {Entity, PrimaryGeneratedColumn, Column, OneToMany, Index, JoinColumn} from "typeorm";
+import {Entity, PrimaryGeneratedColumn, Column, OneToMany, Index, JoinColumn, ManyToMany} from "typeorm";
 import { ObjectType, Field, ID,Int, Arg } from 'type-graphql';
 import {Node,Edge,Connection,PageInfo} from './relay';
-import { OutherConnection, Outher } from "./slideshow/outher";
+import UserGrant from "./auth/user-grant";
 @Entity()
 @ObjectType({implements:Node})
 export class User implements Node{
@@ -30,11 +30,9 @@ export class User implements Node{
     @Index({ unique: true })
     name!:string;
 
-    @Field(type=>OutherConnection,{nullable:true})
-    outhers?:OutherConnection
-    @OneToMany(type => Outher, outher => outher.user)
-    @JoinColumn()
-    dbOuthers?:Outher[];
+    @Field(type=>[UserGrant!]!,{defaultValue:[]})
+    @OneToMany(type=>UserGrant,userGrant=>userGrant.rp)
+    userGrant!:UserGrant[]
 
     @Column()
     mcfPassword!:string;//Modular Crypt Format

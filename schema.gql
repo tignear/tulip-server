@@ -3,54 +3,40 @@
 # !!!   DO NOT MODIFY THIS FILE BY YOURSELF   !!!
 # -----------------------------------------------
 
-input AddImageInput {
-  title: String!
-  file: String!
-  outhers: [ID!]!
-  description: String!
-  tags: [ID!]!
-}
-
-input AddOutherInput {
-  userId: ID!
-  nickname: String!
-}
-
 input AddUserInput {
   name: String!
   password: String!
 }
 
 input AuthorizationInput {
-  userId: ID!
-  password: String!
-  scope: [ScopeType!]!
-  redirectUri: String!
-  responseType: [AuthorizationResponseType!]!
   clientId: String!
-  state: String
+  maxAge: Int
 
   """reply attack protection."""
   nonce: String
-  maxAge: Int
+  redirectUri: String!
+  responseType: [AuthorizationResponseType!]!
+  scope: [ScopeType!]!
+  state: String
 }
 
-union AuthorizationResponse = CodeFlowAuthorizationResponse | ImplicitFlowAuthorizationResponse | HybridFlowAuthorizationResponse
+union AuthorizationResponse = CodeFlowAuthorizationResponse | HybridFlowAuthorizationResponse | ImplicitFlowAuthorizationResponse
 
 enum AuthorizationResponseType {
   Code
-  Token
   IdToken
+  Token
 }
 
 type CodeFlowAuthorizationResponse {
   code: String!
+  scope: [ScopeType!]!
   state: String
 }
 
 interface Connection {
-  pageInfo: PageInfo!
   edges: [Edge!]!
+  pageInfo: PageInfo!
 }
 
 interface Edge {
@@ -64,217 +50,102 @@ enum GrantType {
 }
 
 type HybridFlowAuthorizationResponse {
-  code: String!
   accessToken: String
-  tokenType: TokenType!
-  idToken: String
+  code: String!
   expiresIn: Int
+  idToken: String
   state: String!
-}
-
-type Image implements Node {
-  id: ID!
-  title: String!
-  file: String!
-  outhers: OutherConnection!
-  description: String!
-  tags: TagConnection!
-  updateAt: Int!
-}
-
-type ImageConnection implements Connection {
-  pageInfo: PageInfo!
-  edges: [ImageEdge!]!
-  totalCount: Int!
-}
-
-type ImageEdge implements Edge {
-  cursor: String!
-  node: Image!
-}
-
-input ImagesFilter {
-  title: String
-  outhers: ID
-  description: String
-  tags: [ID!]
-}
-
-input ImagesInput {
-  first: Int
-  after: String
-  last: Int
-  before: String
-  orderBy: ImagesOrder
-  term: String
-  filter: ImagesFilter
-}
-
-enum ImagesOrder {
-  Title
+  tokenType: TokenType!
 }
 
 type ImplicitFlowAuthorizationResponse {
   accessToken: String
-  tokenType: TokenType!
-  idToken: String
   expiresIn: Int
+  idToken: String
   state: String!
-}
-
-type LoginInput {
-  userId: ID!
-  password: String!
+  tokenType: TokenType!
 }
 
 type Mutation {
-  addImage(input: AddImageInput!): Image!
-  updateImage(input: UpdateImageInput!): Image!
-  addOuther(input: AddOutherInput!): Outher!
-  updateOuther(input: UpdateOutherInput!): Outher!
   addUser(input: AddUserInput!): User!
-  updateUser(input: UpdateUserInput!): User!
-  remove(id: ID!): Node!
 
   """only call our web app"""
   authorization(input: AuthorizationInput!): AuthorizationResponse!
-  token(input: TokenInput!): TokenResponse!
   registerRelyingParty(input: RegisterRelyingPartyInput!): RelyingParty!
+  remove(id: ID!): Node!
+  token(input: TokenInput!): TokenResponse!
+  updateUser(input: UpdateUserInput!): User!
 }
 
 interface Node {
   id: ID!
 }
 
-type Outher implements Node {
-  id: ID!
-  nickname: String!
-  images: ImageConnection!
-  user: User!
-}
-
-type OutherConnection implements Connection {
-  pageInfo: PageInfo!
-  edges: [OutherEdge!]!
-  totalCount: Int
-}
-
-type OutherEdge implements Edge {
-  cursor: String!
-  node: Outher!
-}
-
-input OuthersInput {
-  first: Int
-  after: String
-  last: Int
-  before: String
-  orderBy: OuthersOrder
-  term: String
-}
-
-enum OuthersOrder {
-  Id
-  Nickname
-}
-
 type PageInfo {
-  startCursor: String!
   endCursor: String!
   hasNextPage: Boolean!
   hasPreviousPage: Boolean!
+  startCursor: String!
 }
 
 type Query {
-  images(input: ImagesInput!): ImageConnection!
-  outhers(input: OuthersInput!): OutherConnection!
-  users(input: UsersInput!): UserConnection!
   node(id: ID!): Node!
+  users(input: UsersInput!): UserConnection!
 }
 
 input RegisterRelyingPartyInput {
-  redirectUris: [String!]!
-  tokeEndpointAuthMethod: String!
-  grantTypes: [GrantType!]!
-  responseTypes: [AuthorizationResponseType!]!
   clientName: String!
   clientUri: String
-  logoUri: String
-  scopes: [ScopeType!]!
   contacts: [String!]
-  tosUri: String
+  grantTypes: [GrantType!]!
+  logoUri: String
   policyUri: String
+  redirectUris: [String!]!
+  responseTypes: [AuthorizationResponseType!]!
+  scopes: [ScopeType!]!
+  tokeEndpointAuthMethod: String!
+  tosUri: String
 }
 
 type RelyingParty implements Node {
-  id: ID!
-  redirectUris: [String!]!
-  tokenEndpointAuthMethod: String!
-  grantTypes: [GrantType!]!
-  responseTypes: [AuthorizationResponseType!]!
   clientName: String!
   clientUri: String
-  logoUri: String
-  scopes: [ScopeType!]!
   contacts: [String!]!
-  tosUri: String
+  grantTypes: [GrantType!]!
+  id: ID!
+  logoUri: String
   policyUri: String
+  redirectUris: [String!]!
+  responseTypes: [AuthorizationResponseType!]!
+  scopes: [ScopeType!]!
+  tokenEndpointAuthMethod: String!
+  tosUri: String
 }
 
 enum ScopeType {
-  OpenId
   ManageAccount
-}
-
-type Tag implements Node {
-  id: ID!
-  name: String!
-  images: ImageConnection!
-}
-
-type TagConnection implements Connection {
-  pageInfo: PageInfo!
-  edges: [TagEdge!]!
-  totalCount: Int!
-}
-
-type TagEdge implements Edge {
-  cursor: String!
-  node: Tag!
+  OpenId
 }
 
 input TokenInput {
-  grantType: GrantType!
-  code: String
-  redirectUri: String
   clientId: String
+  code: String
+  grantType: GrantType!
+  redirectUri: String
   refreshToken: String
 }
 
 type TokenResponse {
   accessToken: String!
-  tokenType: Float!
   expiresIn: Float!
-  scopes: [ScopeType!]!
-  refreshToken: String!
   idToken: String
+  refreshToken: String!
+  scopes: [ScopeType!]!
+  tokenType: Float!
 }
 
 enum TokenType {
   Bearer
-}
-
-input UpdateImageInput {
-  title: String!
-  file: String!
-  outhers: [ID!]!
-  description: String!
-  tags: [ID!]!
-}
-
-input UpdateOutherInput {
-  id: ID!
-  nickname: String
 }
 
 input UpdateUserInput {
@@ -285,12 +156,12 @@ input UpdateUserInput {
 type User implements Node {
   id: ID!
   name: String!
-  outhers(input: OuthersInput!): OutherConnection
+  userGrant: [UserGrant!]
 }
 
 type UserConnection implements Connection {
-  pageInfo: PageInfo!
   edges: [UserEdge!]!
+  pageInfo: PageInfo!
   totalCount: Int
 }
 
@@ -299,20 +170,26 @@ type UserEdge implements Edge {
   node: User!
 }
 
+type UserGrant implements Node {
+  id: ID!
+  rp: RelyingParty!
+  scope: [ScopeType!]
+  user: User!
+}
+
 input UsersFilter {
-  name: String
   id: ID
+  name: String
 }
 
 input UsersInput {
-  first: Int
   after: String
-  last: Int
   before: String
+  filter: UsersFilter
+  first: Int
+  last: Int
   orderBy: UsersOrder
   term: String
-  filter: UsersFilter
-  outhes: OuthersInput
 }
 
 enum UsersOrder {

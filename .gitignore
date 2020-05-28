@@ -2,3 +2,4 @@
 /.nuxt/
 /coverage/
 *.db
+/secure/

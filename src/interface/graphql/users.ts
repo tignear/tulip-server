@@ -1,24 +1,22 @@
-import { InputType,Resolver,Ctx,Query, Field,ID,Int,registerEnumType, Arg, Mutation, FieldResolver, Root, Info, } from "type-graphql";
-import * as bcrypt from 'bcrypt'
+import { InputType,Resolver,Ctx,Query, Field,ID,Int, Arg, Mutation,   Info, FieldResolver, Root } from "type-graphql";
+import * as bcrypt from 'bcrypt';
 import {GraphQLResolveInfo, GraphQLError} from 'graphql'
 import {UserConnection,User, UserEdge} from '../../models/user'
 import Context from './context'
-import { ParseCursorAll, EncodeCursor,Forward, BuildQuery, BuildPageInfo } from "./utils";
+import { ParseCursorAll, EncodeCursor,Forward} from "./utils";
 import { PageInfo } from "../../models/relay";
-import { OutherConnection, Outher, OutherEdge } from "../../models/slideshow/outher";
-import { OuthersInput, OuthersOrder } from "./slideshow/outhers";
-import { Brackets, Repository, Transaction, TransactionManager, TransactionRepository } from "typeorm";
-import { Service } from "typedi";
+import {  Repository, Transaction,  TransactionRepository } from "typeorm";
+import { Service, Inject } from "typedi";
 import { InjectRepository } from "typeorm-typedi-extensions";
+import { ScopeType } from "../../models/auth/scope";
+import ResolverError from "./error";
+import Loaders from "./loaders";
 export enum UsersOrder{
     Id=1,
     Name
 }
-registerEnumType(UsersOrder, {
-    name: "UsersOrder" // this one is mandatory
-});
-@InputType()
 
+@InputType()
 export class UsersFilter{
     @Field({nullable:true})
     name?:string
@@ -41,8 +39,7 @@ export class UsersInput{
     term?:string
     @Field({nullable:true})
     filter?:UsersFilter
-    @Field({nullable:true})
-    outhes?:OuthersInput
+
 }
 @InputType()
 export class AddUserInput{
@@ -63,11 +60,11 @@ export class UpdateUserInput{
 export class UserResolver{
     constructor(
         @InjectRepository(User) private readonly userRepo:Repository<User>,
-        @InjectRepository(Outher) private readonly outherRepo:Repository<Outher>,
-
+        private readonly loaders:Loaders
         ){
 
     }
+
     @Query(returns => UserConnection)
     async users(@Arg("input") input:UsersInput,@Ctx() ctx: Context,@Info() info:GraphQLResolveInfo):Promise<UserConnection>{
         const order=input.orderBy?input.orderBy:UsersOrder.Id;
@@ -123,9 +120,8 @@ export class UserResolver{
         @Arg("input") input: AddUserInput,
         @Ctx() ctx: Context,
         @TransactionRepository(User) userRepo?:Repository<User>,
-        @TransactionRepository(Outher) outherRepo?:Repository<Outher>,
     ){
-        if(!userRepo||!outherRepo){
+        if(!userRepo){
             throw new GraphQLError("Transaction repository does not exist");
         }
         const user=new User()
@@ -134,10 +130,6 @@ export class UserResolver{
         user.lastAuthTime=new Date();
             
         const r=await userRepo.save(user);
-        const outher=new Outher();
-        outher.user=r;
-        outher.nickname=user.name;
-        await outherRepo.save(outher);
         return r;
     }
     @Mutation(returns => User)
@@ -145,39 +137,20 @@ export class UserResolver{
 
     }
     @FieldResolver()
-    async outhers(@Root() user:User,@Arg("input") input:OuthersInput, @Ctx() ctx: Context):Promise<OutherConnection|null>{
-        const order=input.orderBy??OuthersOrder.Id;
-        const cur=ParseCursorAll(input);
-        if(!cur){
-            throw new TypeError(`invalid cursor!`);
+    async userGrant(@Root() user: User,@Ctx() ctx: Context){
+        console.log(ctx.scopes)
+        if(!ctx.scopes.includes(ScopeType.ManageAccount)){
+            throw new ResolverError("access denied.RP does not have that authority.");
         }
-        let qb=this.outherRepo.createQueryBuilder();
-        let count;
-        ({qb,count}=BuildQuery(qb,{orderKind:OuthersOrder,order,cur},new Brackets(iqb=>{
-            iqb.where(
-                "userDbId = :userId",
-                {userId:user.dbId}
-            )
-        })));
-        
-        const qr=await qb.getMany();
-        const conn=new OutherConnection();
-        conn.pageInfo=BuildPageInfo(cur,count,qr);
-        if(qr.length===count){
-            --qr.length;
+        if(!user.dbId||!ctx.userInfo?.userDbId){
+            throw new ResolverError("access denied.");
         }
-
-        conn.edges=qr.map(e=>{
-            const edge=new OutherEdge();
-            edge.node=e;
-            edge.cursor=EncodeCursor({
-                id:e.id!,
-                value:order===OuthersOrder.Id?e.id!:e.nickname!
-            });
-            return edge;
-        });
-        conn.pageInfo.startCursor=conn.edges[0].cursor;
-        conn.pageInfo.endCursor=conn.edges[conn.edges.length-1].cursor;
-        return conn;
+        if(user.dbId! !==ctx.userInfo.userDbId){
+            throw new ResolverError("access denied.You can see only your own.");
+        }
+        if(user.userGrant){
+            return user.userGrant;
+        }
+        return this.loaders.userGrantFromUserDbIdLoader.load(user.dbId);
     }
 }

@@ -1,12 +1,9 @@
-import { registerEnumType } from "type-graphql";
 
 export enum ScopeType{
     OpenId=1,
     ManageAccount
 }
-registerEnumType(ScopeType, {
-    name: "ScopeType", // this one is mandatory
-});
+
 const stringToEnumMap=new Map<string,ScopeType>();
 stringToEnumMap.set(ScopeType[ScopeType.OpenId].toUpperCase(),ScopeType.OpenId);
 stringToEnumMap.set(ScopeType[ScopeType.ManageAccount].toUpperCase(),ScopeType.ManageAccount);

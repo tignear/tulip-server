@@ -1,6 +1,6 @@
 import * as crypto from 'crypto';
 import { Inject, Service } from "typedi";
-import { Repository, EntityManager, QueryRunner } from "typeorm";
+import { Repository } from "typeorm";
 import {V2 as paseto} from 'paseto';
 import * as jwt from 'jsonwebtoken';
 import { AuthorizationCode, AuthorizationCodeScope } from "../models/auth/authorization-code";
@@ -11,9 +11,8 @@ import ServiceError from "./error";
 import { RefreshToken, RefreshTokenScope } from '../models/auth/refresh-token';
 import AutoLogin from '../models/auth/auto-login';
 import UserGrant from '../models/auth/user-grant';
-import * as bcrypt from 'bcrypt'
-import * as R from 'ramda'
-
+import * as bcrypt from 'bcrypt';
+import base64url from "base64url";
 export type AccessToken= {
     scp: string[],//scope
     sub: string,//userId
@@ -52,7 +51,7 @@ export default class AuthService{
         userDbId:string,
 
     ): Promise<AuthorizationCode> {
-        const code=crypto.randomBytes(16).toString('base64');
+        const code=base64url(crypto.randomBytes(16));
         const ac = new AuthorizationCode(
             code,
             redirectUri,
@@ -74,7 +73,7 @@ export default class AuthService{
             scp:scopes.map(e=>ScopeType[e]),
             aud:RelyingParty.toId(clientDbId),
             exp:new Date((epocSeconds + 3600)*1000),
-            jti:crypto.randomBytes(16).toString('base64')
+            jti:base64url(crypto.randomBytes(16))
         }
         return {
             token: await paseto.encrypt(value,this.pasetoLocalKey,{iat:false}),
@@ -154,7 +153,7 @@ export default class AuthService{
         return ({accessToken,idToken,accessTokenValue,idTokenValue});
     }
     async refreshToken(refreshTokenRepo:Repository<RefreshToken>,userDbId:string,rpDbId:string,scopes:ScopeType[]){
-        const refreshToken=crypto.randomBytes(16).toString('base64');
+        const refreshToken=base64url(crypto.randomBytes(16));
         const refreshTokenEntry=new RefreshToken(refreshToken,scopes.map(
             e=>{
                 const r=new RefreshTokenScope();
@@ -214,7 +213,7 @@ export default class AuthService{
         if(!v){
             throw new ServiceError("refresh token not found");
         }
-        const newRefreshToken= v.token = crypto.randomBytes(16).toString('base64');
+        const newRefreshToken= v.token = base64url(crypto.randomBytes(16));
         await refreshTokenRepo.update(v.id!,v);
         const {token:accessToken,value:accessTokenValue}=await this.accessToken(v.userDbId,v.relyingPartyDbId,v.scopes.map(e=>stringToEnum(e.scope)!),epocSeconds);
         return {refreshToken:newRefreshToken,accessToken,accessTokenValue};
@@ -254,10 +253,11 @@ export default class AuthService{
         accessToken:string|undefined,
         autoLoginToken:string|undefined,
     ){
+
         const now=Date.now();
         const epocSeconds=Math.floor(now/1000);
         if(accessToken){
-            const obj:any=await paseto.decrypt(accessToken,this.pasetoLocalKey,{ignoreExp:true});
+            const obj:any=await paseto.decrypt(accessToken,this.pasetoLocalKey,{ignoreExp:true,ignoreIat:true});
             obj.exp=new Date(obj.exp);
             if(
                 obj.exp.getTime()-now>=0&&
@@ -270,9 +270,11 @@ export default class AuthService{
         if(!autoLoginToken){
             return undefined;
         }
+        
         const r=await autoLoginRepo.findOneOrFail({where:{
             token:autoLoginToken
         }}).catch(e=>undefined);
+        console.log(r)
         if(!r){
             return undefined;
         }
@@ -280,18 +282,22 @@ export default class AuthService{
             return undefined;
         }
         const {token:newAccessToken,value:accessTokenValue} =await this.accessToken(r.userDbId,this.authenticationClientId,[ScopeType.ManageAccount],epocSeconds);
-        r.token=crypto.randomBytes(16).toString('base64');
+        r.token=base64url(crypto.randomBytes(16));
         await autoLoginRepo.update(r.id,r);
         return {accessTokenValue,accessToken:newAccessToken,autoLoginToken:r.token};
     }
     async checkUserGrant(grantRepo:Repository<UserGrant>,rpDbId:string,userDbId:string,scopes:ScopeType[]){
-        const grants=await grantRepo.find({where:{rpDbID:rpDbId,userDbID:userDbId}});
-        const grantedScopes=grants.map(e=>stringToEnum(e.scope));
+        const grant=await grantRepo.findOneOrFail({where:{rpDbID:rpDbId,userDbID:userDbId},relations:["UserGrantedScope"]}).catch(e=>undefined); 
+        if(!grant||!grant.scope){
+            return undefined;
+        }
+        const grantedScopes=grant.scope;
         const additionalRequireScopes=scopes.filter(e=>!grantedScopes.includes(e))
         return {grantedScopes,additionalRequireScopes};
     }
     async login(
         userRepo:Repository<User>,
+        refreshTokenRepo: Repository<RefreshToken>,
         autoLoginRepo:Repository<AutoLogin>,
         userDbId:string,password:string){
             
@@ -304,8 +310,11 @@ export default class AuthService{
         }
         const epocSeconds=Math.floor(Date.now()/1000);
         const {token:accessToken,value:accessTokenValue} =await this.accessToken(userDbId,this.authenticationClientId,[ScopeType.ManageAccount],epocSeconds);
-        const autoLoginToken=AutoLogin.fromUserDbId(userDbId,crypto.randomBytes(16).toString('base64'));
-        await autoLoginRepo.save(autoLoginToken);
-        return {user,accessToken,accessTokenValue,autoLoginToken:autoLoginToken.token};
+        const autoLoginToken=AutoLogin.fromUserDbId(userDbId,base64url(crypto.randomBytes(16)));
+        const [refreshToken]=await Promise.all([
+            this.refreshToken(refreshTokenRepo,userDbId,this.authenticationClientId,[ScopeType.ManageAccount]),
+            autoLoginRepo.save(autoLoginToken)
+        ]);
+        return {user,accessToken,accessTokenValue,refreshToken,autoLoginToken:autoLoginToken.token};
     }
 }

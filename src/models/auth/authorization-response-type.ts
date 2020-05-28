@@ -1,5 +1,3 @@
-import { registerEnumType } from "type-graphql";
-
 enum AuthorizationResponseType {
     Code=1,
     Token,
@@ -27,7 +25,5 @@ export function stringToAuthorizationResponseType(src:(string|undefined)[]|strin
         return a;
     },[]);
 }
-registerEnumType(AuthorizationResponseType, {
-    name: "AuthorizationResponseType", // this one is mandatory
-});
+
 export default AuthorizationResponseType;
