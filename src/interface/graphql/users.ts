@@ -138,7 +138,6 @@ export class UserResolver{
     }
     @FieldResolver()
     async userGrant(@Root() user: User,@Ctx() ctx: Context){
-        console.log(ctx.scopes)
         if(!ctx.scopes.includes(ScopeType.ManageAccount)){
             throw new ResolverError("access denied.RP does not have that authority.");
         }
