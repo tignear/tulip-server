@@ -274,7 +274,6 @@ export default class AuthService{
         const r=await autoLoginRepo.findOneOrFail({where:{
             token:autoLoginToken
         }}).catch(e=>undefined);
-        console.log(r)
         if(!r){
             return undefined;
         }
