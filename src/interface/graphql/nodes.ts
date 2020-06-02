@@ -17,9 +17,7 @@ export class NodeResolver{
     @Query(returns=>Node)
     async node(@Arg("id",type=>ID) id:string,@Ctx() ctx: Context){
         const s=id.split(".");
-        console.log(s);
         const r=await R.path<DataLoader<string,Node>>(R.init(s),this.tree)?.load(R.last(s)!);
-        console.log(r)
         return r;
     }
     @Mutation(returns=>Node)
