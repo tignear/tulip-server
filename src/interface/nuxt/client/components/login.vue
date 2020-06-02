@@ -23,7 +23,7 @@ export default {
             const userId=this.userId;
             const password=this.password;
             try{
-                const response=await this.$http.post("http://localhost:3000/auth",{
+                const response=await this.$http.post(`${TULIP_SERVER_ENDPOINT}/auth`,{
                     userId,
                     password  
                 }).then(e=>e.json());
