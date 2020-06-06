@@ -1,5 +1,6 @@
 import Container from "typedi";
 import * as crypto from "crypto";
+import { JWK } from "jose";
 import { createConnection, getConnectionManager ,useContainer as ormUseContainer,} from "typeorm";
 import { buildSchema, emitSchemaDefinitionFile, registerEnumType } from "type-graphql";
 import { UserResolver, UsersOrder } from "./src/interface/graphql/users";
@@ -35,23 +36,19 @@ export async function setup(){
     Container.set(
         "paseto.v2.local.key",
         await crypto.createSecretKey(await new Promise(resolve=>fs.readFile("./secure/paseto.v2.local.key",(e,d)=>resolve(d)))));//TODO
-    Container.set("openid.iss","http://localhost");
-    const [pub,priv]=await (new Promise((resolve,reject)=>{
-        crypto.generateKeyPair("rsa",{modulusLength:4096 },(err,pub,priv)=>{
-            if(err){
-                reject(err);
-                return;
-            }
-            resolve([pub,priv]);
-            return;
-        }
-    )}));
+    Container.set("openid.iss","http://localhost:3000");
+    Container.set("openid.authorization_endpoint","http://localhost:3000/auth");
+    Container.set("openid.token_endpoint","http://localhost:3000/token")
+    Container.set("openid.jwks_uri","http://localhost:3000/keys");
+    const priv=await JWK.generate("RSA",4096,{alg:"RS256",use:"sig"},true);
+    
     Container.set(
-        "jwt.public.publicKey",
-        pub
+        "jwk.public.publicKey",
+        priv.toJWK(false)
+
     );
     Container.set(
-        "jwt.public.privateKey",
+        "jwk.public.privateKey",
         priv
     );
     Container.set(

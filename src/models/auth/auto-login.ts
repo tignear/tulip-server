@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn, Index } from "typeorm";
+import { Entity, Column, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn, Index, JoinColumn } from "typeorm";
 import { User } from "../user";
 
 @Entity()
@@ -23,6 +23,7 @@ export default class AutoLogin{
     userDbId!:string
 
     @ManyToOne(type=>User)
+    @JoinColumn({name:"userDbId"})
     user?:User
 
     @Column()

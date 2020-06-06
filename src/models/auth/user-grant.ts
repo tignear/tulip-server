@@ -1,5 +1,5 @@
 import { User } from "../user";
-import { ManyToOne, Column, PrimaryGeneratedColumn, Entity, Index, RelationId, OneToMany } from "typeorm";
+import { ManyToOne, Column, PrimaryGeneratedColumn, Entity, Index, RelationId, OneToMany, JoinColumn } from "typeorm";
 import { RelyingParty } from "./relying-party";
 import {Node, Connection, Edge, PageInfo} from "../../models/relay"
 import { Field, ObjectType, ID } from "type-graphql";
@@ -29,6 +29,7 @@ export default class UserGrant implements Node{
     }
     @Field(type=>User)
     @ManyToOne(type=>User,user=>user.dbId)
+    @JoinColumn({name:"userDbId"})
     user?:User;
     @Column("uuid",{nullable:true})
     userDbId!:string;

@@ -1,13 +1,13 @@
-import AuthService, { AccessToken } from '../../../services/auth';
 import { Service } from 'typedi';
+import * as Express from 'express';
 import { Transaction, Repository, TransactionRepository } from 'typeorm';
+import AuthService, { AccessToken } from '../../../services/auth';
 import AutoLogin from '../../../models/auth/auto-login';
 import RelyingPartyService from '../../../services/relying-party';
 import { RelyingParty } from '../../../models/auth/relying-party';
 import UserGrant from '../../../models/auth/user-grant';
 import { stringToEnum, ScopeType } from '../../../models/auth/scope';
 import { User } from '../../../models/user';
-import * as Express from 'express'
 import { AuthorizationCode } from '../../../models/auth/authorization-code';
 import { buildURI } from '../../util';
 import { RefreshToken } from '../../../models/auth/refresh-token';
@@ -54,7 +54,6 @@ export default class Auth{
             res.json({error:"login failed"});
             return;
         }
-        console.log(r.accessTokenValue.exp);
         res.cookie("accessToken",r.accessToken,{maxAge:r.accessTokenValue.exp.getTime()-Date.now(),path:"/auth",sameSite:"lax"});
         res.cookie("autoLoginToken",r.autoLoginToken,{httpOnly:true,maxAge:2*7*24*60*1000,path:"/auth",sameSite:"lax"});//2 weaks
         res.json({accessToken:r.accessToken,refreshToken:r.refreshToken,expiresIn:r.accessTokenValue.exp.getTime(),name:r.user.name});
@@ -129,7 +128,6 @@ export default class Auth{
             return;
         }
         if(!r){
-            console.log("???");
             res.locals.status="login_required";
             next();
             return;
@@ -146,6 +144,7 @@ export default class Auth{
         const userGrant=await this.authService.checkUserGrant(grantRepo,rpDbId,userDbId,scopes);
         const additionalRequireScopes=userGrant?userGrant.additionalRequireScopes:scopes;
         if(additionalRequireScopes.length!==0&&req.query["prompt"]==="none"){
+            
             res.redirect(302,buildURI(redirect_uri,type==="code"?"?":"#",{error:"consent_required",state:req.query.state as string}));
             return;
         }
@@ -180,7 +179,7 @@ export default class Auth{
                             token_type:r.accessToken?"Bearer":undefined,
                             id_token:r.idToken,
                             state:state,
-                            expires_in:r.accessTokenValue?Math.floor(r.accessTokenValue.exp.getTime()/1000).toFixed():undefined
+                            expires_in:r.accessTokenValue?Math.floor((r.accessTokenValue.exp.getTime()-Date.now())/1000).toFixed():undefined
                         }
                     )
                 );
@@ -198,7 +197,7 @@ export default class Auth{
                             token_type:r.accessToken?"Bearer":undefined,
                             id_token:r.idToken,
                             state:state,
-                            expires_in:r.accessTokenValue?Math.floor(r.accessTokenValue.exp.getTime()/1000).toFixed():undefined,
+                            expires_in:r.accessTokenValue?Math.floor((r.accessTokenValue.exp.getTime()-Date.now())/1000).toFixed():undefined,
                             code:r.code
                         }
                     )

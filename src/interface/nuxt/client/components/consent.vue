@@ -1,8 +1,9 @@
 <template>
     <div>
-        Concent
-        <label v-for="(scope, index) in seletedScopeString" :key="index"><input type="checkbox">{{scope}}</label>
-
+        <h2>Concent</h2>
+        <div>
+        <label v-for="(scope) in allScope" :key="scope" ><input checked type="checkbox" :value="scope" v-model="selectedScope">{{scopeToString(scope)}}</label><br>
+        </div>
         <button v-bind:disabled="submitting" @click="onSubmit">{{this.submitting?"承認中":"承認"}}</button>
     </div>
 </template>
@@ -25,17 +26,18 @@ export default class extends Vue{
     @Prop()
     scopes!:ScopeType[];
     
-    seletedScope!:ScopeType[]
+    allScope!:ScopeType[]
+    selectedScope:ScopeType[]=[]
     async onSubmit(){
         this.submitting = true;
-        this.$emit("consent")
+        this.$emit("consent",this.selectedScope);
     }
     data(){
-        return {seletedScope:[...this.additionalRequireScopes,...this.scopes]};
+        const allScope=[...this.additionalRequireScopes,...this.scopes];
+        return {allScope,selectedScope:[...allScope]};
     }
-    
-    get seletedScopeString(){
-        return [...this.additionalRequireScopes,...this.scopes].map(e=>ScopeType[e])
+    scopeToString(scope:ScopeType){
+        return ScopeType[scope];
     }
 }
 </script>

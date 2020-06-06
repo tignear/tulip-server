@@ -13,7 +13,7 @@ class RegisterRelyingPartyInput{
     @Field(type=>[String!]!)
     redirectUris!:string[];
     @Field()
-    tokeEndpointAuthMethod!:string
+    tokenEndpointAuthMethod!:string
     @Field(type=>[GrantType!]!)
     grantTypes!:GrantType[]
     @Field(type=>[AuthorizationResponseType!]!)
@@ -52,7 +52,7 @@ export default class RelyingPartyResolver{
         return this.rpService.register(
             mgr,
             input.redirectUris,
-            input.tokeEndpointAuthMethod,
+            input.tokenEndpointAuthMethod,
             input.grantTypes,
             input.responseTypes,
             input.clientName,

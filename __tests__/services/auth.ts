@@ -1,7 +1,8 @@
 import "reflect-metadata";
 import {useContainer as ormUseContainer, Any, Repository} from "typeorm";
 import Container from "typedi"
-import {V2 as Paseto} from "paseto"
+import {V2 as Paseto} from "paseto";
+import { JWT,JWK } from "jose";
 import * as crypto from "crypto"
 import { AuthorizationCode, AuthorizationCodeScope } from "../../src/models/auth/authorization-code";
 import AuthService  from "../../src/services/auth";
@@ -10,7 +11,6 @@ import RelyingPartyService from "../../src/services/relying-party";
 import { RelyingParty } from "../../src/models/auth/relying-party";
 import * as datemock from 'jest-date-mock'
 import { User } from "../../src/models/user";
-import * as jwt from 'jsonwebtoken'
 import ServiceError from "../../src/services/error";
 import { RefreshToken, RefreshTokenScope } from "../../src/models/auth/refresh-token";
 ormUseContainer(Container);
@@ -38,11 +38,11 @@ beforeAll(async ()=>{
         }
     )}));
     Container.set(
-        "jwt.public.publicKey",
+        "jwk.public.publicKey",
         pub
     );
     Container.set(
-        "jwt.public.privateKey",
+        "jwk.public.privateKey",
         priv
     );
     Container.set(
@@ -187,7 +187,7 @@ describe("authorizationImplicit",()=>{
         expect(v.at_hash).toBeUndefined();
         expect(v.c_hash).toBeUndefined();
         expect(v.auth_time!*1000-user.lastAuthTime!.getTime()).toBeLessThan(1000);
-        const decrypt:any=await jwt.verify(r.idToken!,Container.get("jwt.public.publicKey"),{algorithms:["RS256"]});
+        const decrypt:any=JWT.verify(r.idToken!,Container.get("jwk.public.publicKey"),{algorithms:["RS256"]});
         
         expect(decrypt).toEqual(v);
     })
@@ -222,7 +222,7 @@ describe("authorizationImplicit",()=>{
         expect(vi.c_hash).toBeUndefined()
         expect(vi.auth_time!*1000-user.lastAuthTime!.getTime()).toBeLessThan(1000);
 
-        const decrypti:any=await jwt.verify(r.idToken!,Container.get("jwt.public.publicKey"),{algorithms:["RS256"]});
+        const decrypti:any=JWT.verify(r.idToken!,Container.get("jwk.public.publicKey"),{algorithms:["RS256"]});
         expect(decrypti).toEqual(vi);
 
         const va=r.accessTokenValue!;
@@ -294,7 +294,7 @@ describe("tokenWithAuthorizationCode",()=>{
 
     test("success-not-openid",async ()=>{
         const codeEntry=new AuthorizationCode("codecodecode","https://example.com/redirect","nonce.this is nonce.",[acscopeMa]);
-        codeEntry.createdAt=new Date(lockTime.getTime()-1*60*1000);
+        (codeEntry as any).createdAt=new Date(lockTime.getTime()-1*60*1000);
         codeEntry.user=new User();
         codeEntry.userDbId="user-uuid-user-uuid";
         codeEntry.user.dbId="user-uuid-user-uuid";
@@ -325,7 +325,7 @@ describe("tokenWithAuthorizationCode",()=>{
     });
     test("success-openid",async ()=>{
         const codeEntry=new AuthorizationCode("codecodecode","https://example.com/redirect","nonce.this is nonce.",[acscopeOid]);
-        codeEntry.createdAt=new Date(lockTime.getTime()-1*60*1000);
+        (codeEntry as any).createdAt=new Date(lockTime.getTime()-1*60*1000);
         codeEntry.user=new User();
         codeEntry.userDbId="user-uuid-user-uuid";
         codeEntry.user.dbId="user-uuid-user-uuid";
@@ -362,9 +362,8 @@ describe("tokenWithAuthorizationCode",()=>{
         expect(vi.iss).toBe(Container.get("openid.iss"));
         expect(vi.nonce).toBe(codeEntry.nonce);
         expect(vi.sub).toBe(codeEntry.user.id);
-        const pubKey:crypto.KeyObject=Container.get("jwt.public.publicKey");
         
-        const decrypti=jwt.verify(r.idToken!,pubKey.export({type:"pkcs1",format:"pem"}));
+        const decrypti=JWT.verify(r.idToken!,Container.get("jwk.public.publicKey"));
         expect(decrypti).toEqual(vi);
     });
 })

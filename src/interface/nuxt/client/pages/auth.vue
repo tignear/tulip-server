@@ -83,11 +83,11 @@ export default class extends Vue {
     this.$store.commit("auth/SET_REFRESH_TOKEN", { accessToken, refreshToken });
     this.status = "consent_required";
   }
-  async onConsent() {
+  async onConsent(scope:ScopeType[]) {
     const state = this.$route.query.state as string;
     const redirectUri = this.$route.query.redirect_uri as string;
     const clientId = this.$route.query.client_id as string;
-    const scope = this.$route.query.scope as string;
+    //const scope = this.$route.query.scope as string;
     const responseType = this.$route.query.response_type as string;
     const q = gql.mutation({
       operation: "authorization",
@@ -99,10 +99,7 @@ export default class extends Vue {
             state,
             redirectUri,
             clientId,
-            scope: scope
-              .split(" ")
-              .map(e => scopeMap[e])
-              .filter(e => !!e),
+            scope: scope.map(e=>ScopeType[e]),
             responseType: responseType
               .split(" ")
               .map(e => responseTypeMap[e])
@@ -113,14 +110,13 @@ export default class extends Vue {
       },
       fields: [
         "__typename",
-        { "... on CodeFlowAuthorizationResponse": ["code", "state"] }
+        { "... on CodeFlowAuthorizationResponse": ["code", "state","scope"] }
       ]
     });
 
     const res = await this.$tulip
       .post(TULIP_SERVER_GRAPHQL_ENDPOINT, q)
       .then(e => e.json());
-    console.log(res);
     if (res.errors) {
       return;
     }
@@ -128,16 +124,15 @@ export default class extends Vue {
     const { __typename } = data;
     switch (__typename) {
       case "CodeFlowAuthorizationResponse":
-        const { state, code } = data;
+        const { state, code ,scope:retScope} = data;
         location.href = new URL(
-          `./?state=${state}&code=${code}&`,
+          `?state=${state}&code=${code}&scope=${retScope.map((e:string)=>e.toLowerCase()).join(" ")}`,
           redirectUri
         ).href;
         return;
     }
   }
   mounted(){
-    console.log(Cookies.get("accessToken"));
     this.$store.commit("auth/SET_ACCESS_TOKEN",Cookies.get("accessToken"));
   }
 }

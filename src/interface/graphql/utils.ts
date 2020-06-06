@@ -1,6 +1,6 @@
-import {Base64} from 'js-base64'
 import { SelectQueryBuilder, Brackets, RelationQueryBuilder } from 'typeorm';
 import { PageInfo } from '../../models/relay';
+import base64url from 'base64url';
 type ParseCursorAllInput={
     first?:number
     after?:string
@@ -56,11 +56,11 @@ type CursorData={
     value:string;
 }
 export function ParseCursor(input:string):Partial<CursorData>|null{
-    return JSON.parse(Base64.decode(input));
+    return JSON.parse(base64url.decode(input));
 }
 
 export function EncodeCursor(input:CursorData){
-    return Base64.encode(JSON.stringify({
+    return base64url.encode(JSON.stringify({
         id:input.id,
         value:input.value
     }));

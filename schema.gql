@@ -103,7 +103,7 @@ input RegisterRelyingPartyInput {
   redirectUris: [String!]!
   responseTypes: [AuthorizationResponseType!]!
   scopes: [ScopeType!]!
-  tokeEndpointAuthMethod: String!
+  tokenEndpointAuthMethod: String!
   tosUri: String
 }
 
