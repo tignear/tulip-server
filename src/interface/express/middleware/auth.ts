@@ -21,7 +21,7 @@ export default class Auth{
 
     }
     middlewareGet(req: Express.Request, res:Express.Response, next:Express.NextFunction){
-        this.internal(req,res,next).catch(next);
+        this.internal(req,res,next).catch(e=>{console.log(e);next(e)});
     }
     middlewarePost(req: Express.Request, res:Express.Response, next:Express.NextFunction){
         this.login(req,res,next)
@@ -32,7 +32,6 @@ export default class Auth{
          res:Express.Response, 
          next:Express.NextFunction,
          @TransactionRepository(User) userRepo?:Repository<User>,
-         @TransactionRepository(RefreshToken) refreshTokenRepo?:Repository<RefreshToken>,
          @TransactionRepository(AutoLogin) autoLoginRepo?:Repository<AutoLogin>,
 
         ){
@@ -42,21 +41,21 @@ export default class Auth{
         }
         const userDbId:string|undefined=User.toDbId(rawUserId);
         const password:string|undefined=req.body.password;
-        if(!userRepo||!autoLoginRepo||!refreshTokenRepo){
+        if(!userRepo||!autoLoginRepo){
             throw new Error("Transaction repository does not exist");
         }
         if(!userDbId||!password){
             res.json({error:"userId and password does not gived or userId is invalid"});
             return;
         }
-        const r=await this.authService.login(userRepo,refreshTokenRepo,autoLoginRepo,userDbId,password);
+        const r=await this.authService.login(userRepo,autoLoginRepo,userDbId,password);
         if(!r){
             res.json({error:"login failed"});
             return;
         }
         res.cookie("accessToken",r.accessToken,{maxAge:r.accessTokenValue.exp.getTime()-Date.now(),path:"/auth",sameSite:"lax"});
         res.cookie("autoLoginToken",r.autoLoginToken,{httpOnly:true,maxAge:2*7*24*60*1000,path:"/auth",sameSite:"lax"});//2 weaks
-        res.json({accessToken:r.accessToken,refreshToken:r.refreshToken,expiresIn:r.accessTokenValue.exp.getTime(),name:r.user.name});
+        res.json({accessToken:r.accessToken,expiresIn:r.accessTokenValue.exp.getTime(),name:r.user.name});
         return;
     }
 
@@ -67,7 +66,7 @@ export default class Auth{
         @TransactionRepository(AutoLogin) autoLoginRepo?:Repository<AutoLogin>,
         @TransactionRepository(UserGrant) grantRepo?:Repository<UserGrant>,
         @TransactionRepository(AuthorizationCode) acRepo?:Repository<AuthorizationCode>,
-        @TransactionRepository(User) userRepo?:Repository<User>
+        @TransactionRepository(User) userRepo?:Repository<User>,
     ){
         if(!autoLoginRepo||!rpRepo||!grantRepo||!acRepo||!userRepo){
             throw new Error("transaction repository not exist");
@@ -122,7 +121,9 @@ export default class Auth{
         }
         const accessTokenRaw:string|undefined=req?.cookies?.accessToken;
         const autoLoginToken:string|undefined=req?.cookies?.autoLoginToken;
+        console.log(accessTokenRaw,autoLoginToken)
         const r=await this.authService.autoLogin(autoLoginRepo,accessTokenRaw,autoLoginToken);
+        console.log(r)
         if(!r&&req.query["prompt"]==="none"){
             res.redirect(302,buildURI(redirect_uri,type==="code"?"?":"#",{error:"login_required",state:req.query.state as string}));
             return;
@@ -142,6 +143,7 @@ export default class Auth{
             return stringToEnum(e);
         }).filter(e=>e) as ScopeType[];
         const userGrant=await this.authService.checkUserGrant(grantRepo,rpDbId,userDbId,scopes);
+        console.log("userGrant:",userGrant);
         const additionalRequireScopes=userGrant?userGrant.additionalRequireScopes:scopes;
         if(additionalRequireScopes.length!==0&&req.query["prompt"]==="none"){
             
@@ -160,15 +162,16 @@ export default class Auth{
         switch(type){
             case "code":{
                 const r=await this.authService.authorizationCode(acRepo,redirect_uri,nonce,scopes,rpDbId,userDbId);
-                res.redirect(302,buildURI(redirect_uri,"?",{code:r.code,state:state}));
-                return;
+                console.log(r);
+                return res.redirect(302,buildURI(redirect_uri,"?",{code:r.code,state:state}));
+                
             }
             case "implicit":{
                 if(!nonce){
                     res.redirect(302,buildURI(redirect_uri,"#",{error:"invalid_request"}));
                     return;
                 }
-                const r=await this.authService.authorizationImplicit(userRepo,rpRepo,response_typeStringSet.has("token"),response_typeStringSet.has("id_token"),userDbId,rpDbId,nonce,scopes);
+                const r=await this.authService.authorizationImplicit(userRepo,rpRepo,grantRepo,response_typeStringSet.has("token"),response_typeStringSet.has("id_token"),userDbId,rpDbId,nonce,scopes);
                 res.redirect(
                     302,
                     buildURI(
@@ -186,7 +189,7 @@ export default class Auth{
                 return;
             }
             case "hybrid":{
-                const r=await this.authService.hybridFlowAuthorization(acRepo,userRepo,response_typeStringSet.has("token"),response_typeStringSet.has("id_token"),userDbId,rpDbId,redirect_uri,scopes,nonce);
+                const r=await this.authService.hybridFlowAuthorization(acRepo,userRepo,grantRepo,response_typeStringSet.has("token"),response_typeStringSet.has("id_token"),userDbId,rpDbId,redirect_uri,scopes,nonce);
                 res.redirect(
                     302,
                     buildURI(

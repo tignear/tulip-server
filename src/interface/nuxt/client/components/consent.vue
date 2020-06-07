@@ -12,7 +12,7 @@
 import "@nuxt/http"
 import Vue from 'vue';
 import * as express from 'express';
-import {Component, Prop} from 'nuxt-property-decorator'
+import {Component, Prop} from 'nuxt-property-decorator';
 import {Context } from '@nuxt/types';
 import { TULIP_SERVER_GRAPHQL_ENDPOINT } from "../../settings";
 import * as gql from 'gql-query-builder';

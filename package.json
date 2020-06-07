@@ -31,6 +31,7 @@
     "@types/ramda": "^0.27.6",
     "@types/webpack": "^4.41.0",
     "apollo-server": "^2.14.2",
+    "async-mutex": "^0.2.2",
     "babel-plugin-transform-class-properties": "^6.24.1",
     "babel-plugin-transform-decorators-legacy": "^1.3.5",
     "base64url": "^3.0.1",
@@ -41,7 +42,6 @@
     "dataloader": "^2.0.0",
     "fs": "^0.0.1-security",
     "gql-query-builder": "^3.3.0",
-    "graphql": "^15.0.0",
     "helmet": "^3.22.0",
     "jose": "^1.27.1",
     "js-cookie": "^2.2.1",
@@ -72,5 +72,8 @@
     "serve": "nuxt-ts start",
     "serve-dev": "nuxt-ts",
     "test": "jest --coverage"
+  },
+  "resolutions": {
+    "graphql": "15.0.0"
   }
 }

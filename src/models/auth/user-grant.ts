@@ -8,6 +8,11 @@ import { ScopeType, stringToEnum } from "./scope";
 @Entity()
 @Index(["userDbId", "rpDbId"], { unique: true })
 export default class UserGrant implements Node{
+    constructor(userDbId:string,rpDbId:string,dbScope:UserGrantedScope[]){
+        this.userDbId=userDbId;
+        this.rpDbId=rpDbId;
+        this.dbScope=dbScope;
+    }
     @PrimaryGeneratedColumn("uuid")
     dbId!:string;
     @Field(type=>ID!)
@@ -42,11 +47,14 @@ export default class UserGrant implements Node{
     get scope():ScopeType[]|undefined{
         return this.dbScope?this.dbScope.map(e=>stringToEnum(e.dbScope)!):undefined;
     }
-    @OneToMany(type=>UserGrantedScope,userGrantedScope=>userGrantedScope.userGrant)
-    dbScope!:UserGrantedScope[];
+    @OneToMany(type=>UserGrantedScope,userGrantedScope=>userGrantedScope.userGrant,{cascade:true,nullable:true})
+    dbScope?:UserGrantedScope[];
 }
 @Entity()
 export class UserGrantedScope{
+    constructor(dbScope:string){
+        this.dbScope=dbScope;
+    }
     @PrimaryGeneratedColumn("uuid")
     dbId!:string;
     @ManyToOne(type=>UserGrant,userGrant=>userGrant.dbScope)
@@ -57,7 +65,7 @@ export class UserGrantedScope{
         return stringToEnum(this.dbScope)!;
     }
 }
-@ObjectType({implements:Edge})
+/*@ObjectType({implements:Edge})
 export class UserGrantEdge implements Edge{
     @Field()
     cursor?: string;
@@ -71,4 +79,4 @@ export class UserGrantConnection implements Connection{
     pageInfo?: PageInfo;
     @Field(type=>[UserGrantEdge!]!)
     edges?: UserGrantEdge[];
-}
+}*/

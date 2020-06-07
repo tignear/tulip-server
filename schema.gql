@@ -156,7 +156,7 @@ input UpdateUserInput {
 type User implements Node {
   id: ID!
   name: String!
-  userGrant: [UserGrant!]
+  userGrant(input: UserGrantInput): [UserGrant!]
 }
 
 type UserConnection implements Connection {
@@ -175,6 +175,10 @@ type UserGrant implements Node {
   rp: RelyingParty!
   scope: [ScopeType!]
   user: User!
+}
+
+input UserGrantInput {
+  rpId: ID
 }
 
 input UsersFilter {

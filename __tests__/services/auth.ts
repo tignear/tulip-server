@@ -76,9 +76,11 @@ describe('authorizationWithCode',()=>{
             save:jest.fn()
         };
         const rprepo:any={};
+        const grantRepo:any={}
         const ac=await service.authorizationWithCode(
             rprepo,
             codeRepo,
+            grantRepo,
             "user-uuid-user-uuid",
             "rprp-uuid-rprp-uuid",
             "https://example.com/rediret",
@@ -118,6 +120,7 @@ describe("authorizationImplicit",()=>{
             return k===rp.dbId?Promise.resolve(rp):Promise.reject(k)
         })
     }
+    const grantRepo={}
     beforeAll(()=>{
         localKey=Container.get("paseto.v2.local.key")
         service=Container.get(AuthService);
@@ -134,6 +137,7 @@ describe("authorizationImplicit",()=>{
         const r=await service.authorizationImplicit(
             <any>userRepo,
             <any>rpRepo,
+            <any>grantRepo,
             true,false,
             "user-uuid-user-uuid",
             "rprp-uuid-rprp-uuid",
@@ -162,6 +166,7 @@ describe("authorizationImplicit",()=>{
         const r=await service.authorizationImplicit(
             <any>userRepo,
             <any>rpRepo,
+            <any>grantRepo,
             false,true,
             "user-uuid-user-uuid",
             "rprp-uuid-rprp-uuid",
@@ -195,6 +200,7 @@ describe("authorizationImplicit",()=>{
         const r=await service.authorizationImplicit(
             <any>userRepo,
             <any>rpRepo,
+            <any>grantRepo,
             true,true,
             "user-uuid-user-uuid",
             "rprp-uuid-rprp-uuid",
@@ -241,6 +247,7 @@ describe("authorizationImplicit",()=>{
         const m=service.authorizationImplicit(
             <any>userRepo,
             <any>rpRepo,
+            <any>grantRepo,
             true,true,
             "user-uuid-user-uuid",
             "rprp-uuid-inva-uuid",
@@ -256,6 +263,7 @@ describe("authorizationImplicit",()=>{
         const m=service.authorizationImplicit(
             <any>userRepo,
             <any>rpRepo,
+            <any>grantRepo,
             true,true,
             "user-uuid-inva-uuid",
             "rprp-uuid-rprp-uuid",

@@ -15,11 +15,5 @@ export const mutations: MutationTree<RootState> = {
         state._accessToken = accessToken;
         (this.$tulip as unknown as NuxtHTTPInstance).setToken(accessToken??false,"Bearer");
     },
-    SET_REFRESH_TOKEN: function(state, { refreshToken, accessToken }: { refreshToken: string, accessToken?: string }){
-        state._accessToken = accessToken;
-        state._refreshToken = refreshToken;
-        (this.$tulip as unknown as NuxtHTTPInstance).setToken(accessToken??false,"Bearer");
 
-        
-    }
 }

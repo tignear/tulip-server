@@ -10,7 +10,8 @@ import RelyingPartyResolver from "./src/interface/graphql/auth/relying-party";
 import { ScopeType } from "./src/models/auth/scope";
 import AuthorizationResponseType from "./src/models/auth/authorization-response-type";
 import GrantType from "./src/models/auth/grant-type";
-import * as fs from "fs";
+import {promises as fs} from "fs";
+import { monekypatch } from "./src/monkeypatch";
 function registerEnumTypes(){
     registerEnumType(ScopeType, {
         name: "ScopeType"
@@ -35,7 +36,7 @@ export async function setup(){
     registerEnumTypes();
     Container.set(
         "paseto.v2.local.key",
-        await crypto.createSecretKey(await new Promise(resolve=>fs.readFile("./secure/paseto.v2.local.key",(e,d)=>resolve(d)))));//TODO
+        crypto.createSecretKey(await fs.readFile("./secure/paseto.v2.local.key")));//TODO
     Container.set("openid.iss","http://localhost:3000");
     Container.set("openid.authorization_endpoint","http://localhost:3000/auth");
     Container.set("openid.token_endpoint","http://localhost:3000/token")
@@ -70,7 +71,8 @@ export async function setup(){
     );
     
     await emitSchemaDefinitionFile("schema.gql", schema);
-    const mgr=await getConnectionManager();
+    const mgr=getConnectionManager();
+    monekypatch();
     if(!mgr.has("default")){
        await createConnection();
     }

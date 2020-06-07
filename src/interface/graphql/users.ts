@@ -11,6 +11,7 @@ import { InjectRepository } from "typeorm-typedi-extensions";
 import { ScopeType } from "../../models/auth/scope";
 import ResolverError from "./error";
 import Loaders from "./loaders";
+import { RelyingParty } from "../../models/auth/relying-party";
 export enum UsersOrder{
     Id=1,
     Name
@@ -54,6 +55,11 @@ export class UpdateUserInput{
     id!:string
     @Field({nullable:true})
     name?:string
+}
+@InputType()
+export class UserGrantInput{
+    @Field(type=>ID,{nullable:true})
+    rpId?:string
 }
 @Service()
 @Resolver(of=>User)
@@ -137,7 +143,7 @@ export class UserResolver{
 
     }
     @FieldResolver()
-    async userGrant(@Root() user: User,@Ctx() ctx: Context){
+    async userGrant(@Root() user: User,@Ctx() ctx: Context,@Arg("input",{nullable:true}) input?:UserGrantInput){
         if(!ctx.scopes.includes(ScopeType.ManageAccount)){
             throw new ResolverError("access denied.RP does not have that authority.");
         }
@@ -150,6 +156,18 @@ export class UserResolver{
         if(user.userGrant){
             return user.userGrant;
         }
-        return this.loaders.userGrantFromUserDbIdLoader.load(user.dbId);
+        if(!input){
+            return this.loaders.userGrantsFromUserDbIdLoader.load(user.dbId);
+        }
+        if(!input.rpId){
+            return this.loaders.userGrantsFromUserDbIdLoader.load(user.dbId);
+        }
+        const dbId=RelyingParty.toDbId(input.rpId);
+        if(!dbId){
+            throw new Error("inavlid rpid format");
+        }
+        return this.loaders.userGrantsFromUserDbIdLoader.load(user.dbId).then(e=>{
+            return e?[e.find(k=>k.rpDbId===dbId)]:e
+        });
     }
 }

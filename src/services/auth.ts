@@ -10,7 +10,7 @@ import { User } from "../models/user";
 import ServiceError from "./error";
 import { RefreshToken, RefreshTokenScope } from '../models/auth/refresh-token';
 import AutoLogin from '../models/auth/auto-login';
-import UserGrant from '../models/auth/user-grant';
+import UserGrant, { UserGrantedScope } from '../models/auth/user-grant';
 import * as bcrypt from 'bcrypt';
 import base64url from "base64url";
 import RelyingPartyService from './relying-party';
@@ -116,6 +116,7 @@ export default class AuthService{
     async authorizationWithCode(
         rprepo:Repository<RelyingParty>,
         acrepo:Repository<AuthorizationCode>,
+        grantRepo:Repository<UserGrant>,
         userDbId:string,
         rpDbId:string,
         redirectUri:string,
@@ -126,11 +127,13 @@ export default class AuthService{
         if(!await this.relyingPartyService.checkIdAndRedirectUri(rprepo,rpDbId,redirectUri)){
             throw new ServiceError("check id and redirect uri failed");
         }
+        await this.consent(grantRepo,userDbId,rpDbId,scope);
         return await this.authorizationCode(acrepo,redirectUri,nonce,scope,rpDbId,userDbId);
     }
     async authorizationImplicit(
         userrepo:Repository<User>,
         rprepo:Repository<RelyingParty>,
+        grantRepo:Repository<UserGrant>,
         require_accesstoken:boolean,
         require_idtoken:boolean,
         userDbId:string,
@@ -139,7 +142,7 @@ export default class AuthService{
         scopes:ScopeType[],
     ){
         //this.relyingPartyService.checkIdAndRedirectUri(rprepo,rpDbId,redirectUri);
-        const rp = await rprepo.findOneOrFail(rpDbId).catch(e => undefined);
+        const rp = await rprepo.findOne(rpDbId);
         if(!rp||!rp.dbId){
             throw new ServiceError("RelyingParty not found");
         }
@@ -152,11 +155,12 @@ export default class AuthService{
         if(!require_idtoken){
             return {accessToken,accessTokenValue};
         }
-        const user= await userrepo.findOneOrFail(userDbId).catch(e => undefined);
+        const user= await userrepo.findOne(userDbId);
         if(!user||!user.dbId||!user.lastAuthTime){
             throw new ServiceError("user not found");
         }
         const {token:idToken,value:idTokenValue}=await this.idToken(user.dbId!,Math.floor(user.lastAuthTime.getTime()/1000),rp.dbId,epocSeconds,nonce,undefined,accessToken,undefined);
+        await this.consent(grantRepo,userDbId,rpDbId,scopes);
         return ({accessToken,idToken,accessTokenValue,idTokenValue});
     }
     async refreshToken(refreshTokenRepo:Repository<RefreshToken>,userDbId:string,rpDbId:string,scopes:ScopeType[],code?:string){
@@ -169,7 +173,7 @@ export default class AuthService{
             }),code);
         refreshTokenEntry.userDbId=userDbId;
         refreshTokenEntry.relyingPartyDbId=rpDbId;
-        await refreshTokenRepo.create(refreshTokenEntry);
+        await refreshTokenRepo.save(refreshTokenEntry);
         return refreshToken;
     }
     async tokenWithAuthorizationCode(
@@ -181,7 +185,7 @@ export default class AuthService{
     ){
         const now=Date.now();
         const epocSeconds = Math.floor( now/ 1000);
-        const c = await codeRepo.findOneOrFail(code, { relations: ["user","scopes"] }).catch(e => undefined);
+        const c = await codeRepo.findOne(code, { relations: ["user","scopes"] }).catch(e => undefined);
         if (!c) {
             await refreshTokenRepo.delete({"code":code});
             throw new ServiceError("code not found");
@@ -220,9 +224,23 @@ export default class AuthService{
         ));
         return {accessToken,accessTokenValue,refreshToken,idToken,idTokenValue};
     }
+    async consent(userGrantRepo:Repository<UserGrant>,userDbId:string,rpDbId:string,scopes:ScopeType[]){
+        console.log(userDbId,rpDbId)
+        let grant=await userGrantRepo.findOne({where:{rpDbId:rpDbId,userDbId:userDbId}});
+        console.log(grant);
+        const nscope=scopes.map(e=>new UserGrantedScope(ScopeType[e]));
+        if(!grant){
+            grant=new UserGrant(userDbId,rpDbId,nscope);
+
+        }else{
+            grant.dbScope=nscope;
+        }
+        return await userGrantRepo.save(grant);
+
+    }
     async refresh(refreshTokenRepo:Repository<RefreshToken>,refreshToken:string){
         const epocSeconds=Math.floor(Date.now()/1000);
-        const v = await refreshTokenRepo.findOneOrFail({ where: { token: refreshToken }, select: ["userDbId"] }).catch(e => undefined);
+        const v = await refreshTokenRepo.findOne({ where: { token: refreshToken }, select: ["userDbId"] });
         if(!v){
             throw new ServiceError("refresh token not found");
         }
@@ -234,6 +252,7 @@ export default class AuthService{
     async hybridFlowAuthorization(
         acRepo:Repository<AuthorizationCode>,
         userRepo:Repository<User>,
+        grantRepo:Repository<UserGrant>,
         require_token:boolean,
         require_idToken:boolean,
         userDbId:string,
@@ -251,7 +270,7 @@ export default class AuthService{
         if(require_token){
             ({token:accessToken,value:accessTokenValue}=await this.accessToken(userDbId,rpDbId,scopes,epocSeconds));
         }
-        const user=await userRepo.findOneOrFail(userDbId).catch(e=>undefined);
+        const user=await userRepo.findOne(userDbId);
         if(!user){
             throw new ServiceError("user not found");
         }
@@ -259,6 +278,7 @@ export default class AuthService{
         if(require_idToken){
             ({token:idToken,value:idTokenValue }=await this.idToken(userDbId,Math.floor(user.lastAuthTime!.getTime()/1000),rpDbId,epocSeconds,nonce,undefined,accessToken,code));
         }
+        await this.consent(grantRepo,userDbId,rpDbId,scopes);
         return {accessToken,accessTokenValue,idToken,idTokenValue,code};
     }
     async autoLogin(
@@ -272,6 +292,7 @@ export default class AuthService{
         if(accessToken){
             const obj:any=await paseto.decrypt(accessToken,this.pasetoLocalKey,{ignoreExp:true,ignoreIat:true});
             obj.exp=new Date(obj.exp);
+            obj.scp=stringToEnum(obj.scp);
             if(
                 obj.exp.getTime()-now>=0&&
                 obj.sub===this.authenticationClientId&&
@@ -284,9 +305,9 @@ export default class AuthService{
             return undefined;
         }
         
-        const r=await autoLoginRepo.findOneOrFail({where:{
+        const r=await autoLoginRepo.findOne({where:{
             token:autoLoginToken
-        }}).catch(e=>undefined);
+        }});
         if(!r){
             return undefined;
         }
@@ -299,7 +320,8 @@ export default class AuthService{
         return {accessTokenValue,accessToken:newAccessToken,autoLoginToken:r.token};
     }
     async checkUserGrant(grantRepo:Repository<UserGrant>,rpDbId:string,userDbId:string,scopes:ScopeType[]){
-        const grant=await grantRepo.findOneOrFail({where:{rpDbID:rpDbId,userDbID:userDbId},relations:["UserGrantedScope"]}).catch(e=>undefined); 
+        const grant=await grantRepo.findOne({where:{rpDbId:rpDbId,userDbId:userDbId},relations:["dbScope"]});
+        console.log("grant",grant)
         if(!grant||!grant.scope){
             return undefined;
         }
@@ -309,7 +331,6 @@ export default class AuthService{
     }
     async login(
         userRepo:Repository<User>,
-        refreshTokenRepo: Repository<RefreshToken>,
         autoLoginRepo:Repository<AutoLogin>,
         userDbId:string,password:string){
             
@@ -323,10 +344,7 @@ export default class AuthService{
         const epocSeconds=Math.floor(Date.now()/1000);
         const {token:accessToken,value:accessTokenValue} =await this.accessToken(userDbId,this.authenticationClientId,[ScopeType.ManageAccount],epocSeconds);
         const autoLoginToken=AutoLogin.fromUserDbId(userDbId,base64url(crypto.randomBytes(64)));
-        const [refreshToken]=await Promise.all([
-            this.refreshToken(refreshTokenRepo,userDbId,this.authenticationClientId,[ScopeType.ManageAccount],),
-            autoLoginRepo.save(autoLoginToken)
-        ]);
-        return {user,accessToken,accessTokenValue,refreshToken,autoLoginToken:autoLoginToken.token};
+        await autoLoginRepo.save(autoLoginToken);
+        return {user,accessToken,accessTokenValue,autoLoginToken:autoLoginToken.token};
     }
 }

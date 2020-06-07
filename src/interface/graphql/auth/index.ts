@@ -12,6 +12,7 @@ import ResolverError from "../error";
 import RelyingPartyService from "../../../services/relying-party";
 import GrantType from "../../../models/auth/grant-type";
 import AuthorizationResponseType from "../../../models/auth/authorization-response-type";
+import UserGrant from "../../../models/auth/user-grant";
 
 
 @InputType()
@@ -206,10 +207,11 @@ export class AuthResolver {
         input: AuthorizationInput,
         context: Context,
         @TransactionRepository(RelyingParty) rprepo?: Repository<RelyingParty>,
-        @TransactionRepository(AuthorizationCode) acrepo?: Repository<AuthorizationCode>
+        @TransactionRepository(AuthorizationCode) acrepo?: Repository<AuthorizationCode>,
+        @TransactionRepository(UserGrant) grantRepo?:Repository<UserGrant>
     ): Promise<CodeFlowAuthorizationResponse> {
 
-        if (!input.clientId || !input.redirectUri) {
+        if (!input.clientId || !input.redirectUri||!grantRepo) {
             throw new ResolverError("client id is must not be null");
         }
         if(!rprepo||!acrepo){
@@ -230,7 +232,7 @@ export class AuthResolver {
         if(!this.rpService.checkIdAndRedirectUri(rprepo,rpdbid,input.redirectUri)){
             throw new ResolverError("invalid RedirectUri or clientId");
         }
-        const ac=await this.authService.authorizationWithCode(rprepo,acrepo,userdbid,rpdbid,input.redirectUri,input.nonce,input.scope);
+        const ac=await this.authService.authorizationWithCode(rprepo,acrepo,grantRepo,userdbid,rpdbid,input.redirectUri,input.nonce,input.scope);
         return new CodeFlowAuthorizationResponse(ac.code,input.scope,input.state);
     }
     @Transaction()
@@ -239,12 +241,13 @@ export class AuthResolver {
         context: Context,
         @TransactionRepository(RelyingParty) relyingPartyRepo?: Repository<RelyingParty>,
         @TransactionRepository(User) userRepo?: Repository<User>,
+        @TransactionRepository(UserGrant) grantRepo?:Repository<UserGrant>
     ):Promise<ImplicitFlowAuthorizationResponse>{
         
         if (!input.clientId || !input.redirectUri) {
             throw new ResolverError("client id is must not be null");
         }
-        if(!relyingPartyRepo||!userRepo){
+        if(!relyingPartyRepo||!userRepo||!grantRepo){
             throw new ResolverError("Transaction repository does not exist");
         }
         if(!context.userInfo){
@@ -263,6 +266,7 @@ export class AuthResolver {
         const r=await this.authService.authorizationImplicit(
             userRepo,
             relyingPartyRepo,
+            grantRepo,
             input.responseType.includes(AuthorizationResponseType.Token),
             input.responseType.includes(AuthorizationResponseType.IdToken),
             context.userInfo.userDbId,
@@ -318,10 +322,11 @@ export class AuthResolver {
         @TransactionRepository(AuthorizationCode) acRepo?: Repository<AuthorizationCode>, 
         @TransactionRepository(User) userRepo?: Repository<User>,
         @TransactionRepository(RelyingParty) rpRepo?: Repository<RelyingParty>,
+        @TransactionRepository(UserGrant) grantRepo?:Repository<UserGrant>
     )
     {
 
-        if(!acRepo||!userRepo||!rpRepo){
+        if(!acRepo||!userRepo||!rpRepo||!grantRepo){
             throw new ResolverError("transaction repository not exist");
         }
         if(!context.userInfo){
@@ -337,6 +342,7 @@ export class AuthResolver {
         const r=await this.authService.hybridFlowAuthorization(
             acRepo,
             userRepo,
+            grantRepo,
             input.responseType.includes(AuthorizationResponseType.Token),
             input.responseType.includes(AuthorizationResponseType.IdToken),
             context.userInfo.userDbId,

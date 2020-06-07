@@ -24,7 +24,7 @@ import Login from "../components/login.vue";
 import Consent from "../components/consent.vue";
 import { TULIP_SERVER_GRAPHQL_ENDPOINT } from "../../settings";
 import * as gql from "gql-query-builder";
-import { ScopeType } from "../../../../models/auth/scope";
+import { ScopeType, stringToEnum } from "../../../../models/auth/scope";
 import Cookies from "js-cookie";
 const scopeMap: { [k in string]: string | undefined } = {
   openid: "OpenId"
@@ -74,13 +74,35 @@ export default class extends Vue {
 
   async onLogin({
     accessToken,
-    refreshToken,
-    
+    userId,
   }: {
+    userId:string;
     accessToken: string;
-    refreshToken: string;
   }) {
-    this.$store.commit("auth/SET_REFRESH_TOKEN", { accessToken, refreshToken });
+    this.$store.commit("auth/SET_ACCESS_TOKEN", accessToken);
+    const query=`query($userId:ID!,$rpId:ID) {
+      node(id: $userId) {
+        ... on User {
+          name
+          userGrant(input:{
+              rpId:$rpId
+          } ){
+            rp{
+              clientName
+            }
+            scope
+          }
+        }
+      }
+    }`;
+        const rpId = this.$route.query.client_id as string;
+
+    const ret= await this.$tulip
+      .post(TULIP_SERVER_GRAPHQL_ENDPOINT, {query,variables:{rpId,userId}})
+      .then(e => e.json());
+    this.scopes=stringToEnum(ret.data.node.userGrant[0].scope);
+    const scope = this.$route.query.scope as string;
+    this.additionalRequireScopes=(scope.split(" ").map(e=>stringToEnum(e)).filter(e=>e!==undefined) as ScopeType[]).filter(e=>!this.scopes.includes(e))
     this.status = "consent_required";
   }
   async onConsent(scope:ScopeType[]) {
